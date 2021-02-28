@@ -1,0 +1,23 @@
+Package: CNViz
+Type: Package
+Title: Copy Number Visualization
+Version: 0.1.0
+Authors@R: person("Rebecca", "Greenblatt", email = "rebecca.greenblatt@gmail.com",
+  role = c("aut", "cre"))
+Description: CNViz takes probe, gene, and segment-level log2 copy number ratios and helps you to visualize your sample's copy number profile. You can also integrate loss of heterozygosity (LOH) and single nucleotide variant (SNV) data. 
+Depends:
+    R (>= 4.03),
+    shiny (>= 1.5.0),
+    plotly (>= 4.9.3),
+Imports:
+    dplyr,
+    cBioPortalData,
+    DT,
+    magick,
+    karyoploteR,
+    CopyNumberPlots,
+    GenomicRanges
+License: BSD 3-Clause License
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.1.1
