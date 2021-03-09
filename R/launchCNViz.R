@@ -10,10 +10,28 @@
 #' @param segment_data A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE
 #' @param snv_data A dataframe containg SNVs and columns of your choosing. The only required column is gene. Optional columns: start, mutation_id; where start indicates the starting position of the mutation and mutation_id is a string in any format. Additional columns might include depth, allelic_fraction.
 #' @param meta_data A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.
-#' @export
+#'
+#' @import shiny
+#' @import stats
+#' @import utils
+#' @importFrom grDevices dev.off pdf
+#' @importFrom dplyr select filter summarise mutate left_join group_by n between
+#' @importFrom plotly plot_ly add_segments add_trace layout renderPlotly plotlyOutput event_data subplot
+#' @importFrom karyoploteR plotKaryotype
+#' @importFrom CopyNumberPlots plotCopyNumberCalls
+#' @importFrom GenomicRanges makeGRangesFromDataFrame
+#' @importFrom magrittr %>%
+#' @importFrom cBioPortalData cBioPortal getDataByGenePanel
+#' @importFrom DT dataTableOutput renderDataTable formatPercentage datatable formatStyle
+#' @importFrom scales rescale
+#' @importFrom graphics legend
+#'
+#' @export cbio_studies
+#' @export cytoband_data
+#' @export launchCNViz
+#'
 
 launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_data = data.frame(), segment_data = data.frame(), snv_data = data.frame(), meta_data = data.frame()) {
-  require(shiny)
   cbio <- cBioPortal()
 
   colnames(probe_data) <- tolower(colnames(probe_data))
@@ -109,7 +127,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     # add copy number estimate to gene_data
     if(nrow(gene_data) > 0){
-      gene_data <- filter(gene_data, !(gene %in% c('Antitarget', "", ".")))
+      gene_data <- dplyr::filter(gene_data, !(gene %in% c('Antitarget', "", ".")))
       gene_data$m <- (gene_data$start + gene_data$end)/2
       gene_data$cn <- round((2^gene_data$log2)*2)
       gene_data$copies <- ifelse(gene_data$cn == 1, " copy", " copies")
@@ -120,11 +138,11 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     if(nrow(probe_data) > 0){
       probe_sizeref <- 0.5
-      probe_data <- filter(probe_data, !(gene %in% c('Antitarget', "", ".")))
+      probe_data <- dplyr::filter(probe_data, !(gene %in% c('Antitarget', "", ".")))
       probe_data$m <- (probe_data$start + probe_data$end)/2
       probe_data$loh <- rep(NULL, nrow(probe_data))
       if("weight" %in% colnames(probe_data)){
-        probe_data$total_weight <- rescale(probe_data$weight, c(5,25))
+        probe_data$total_weight <- scales::rescale(probe_data$weight, c(5,25))
       } else {
         probe_data$total_weight <- rep(10, nrow(probe_data))
       }
@@ -133,26 +151,26 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     # add copy number estimate to probe_data
     if("weight" %in% colnames(probe_data)){
-      probe_by_gene <- probe_data %>% group_by(chr, gene) %>%
-        summarise(s = min(start), e = max(end),
-                  mean_log2 = weighted.mean(log2, weight),
+      probe_by_gene <- probe_data %>% dplyr::group_by(chr, gene) %>%
+        dplyr::summarise(s = min(start), e = max(end),
+                  mean_log2 = stats::weighted.mean(log2, weight),
                   total_weight = sum(weight)) %>%
-        mutate(log2 = mean_log2, m = (s+e)/2) %>%
-        mutate(cn = round((2^log2)*2)) %>%
-        mutate(blue = as.numeric(log2 < -0.41 | log2 > 0.32),
+        dplyr::mutate(log2 = mean_log2, m = (s+e)/2) %>%
+        dplyr::mutate(cn = round((2^log2)*2)) %>%
+        dplyr::mutate(blue = as.numeric(log2 < -0.41 | log2 > 0.32),
                copies = ifelse(cn == 1, " copy", " copies"))
-      probe_by_gene$total_weight <- rescale(probe_by_gene$total_weight, c(5,25))
+      probe_by_gene$total_weight <- scales::rescale(probe_by_gene$total_weight, c(5,25))
     } else if(nrow(probe_data) > 0) {
-      probe_by_gene <- probe_data %>% group_by(chr, gene) %>%
-        summarise(s = min(start), e = max(end),
+      probe_by_gene <- probe_data %>% dplyr::group_by(chr, gene) %>%
+        dplyr::summarise(s = min(start), e = max(end),
                   mean_log2 = mean(log2),
                   total_weight = n()) %>%
-        mutate(log2 = mean_log2, m = (s+e)/2) %>%
-        mutate(cn = round((2^log2)*2)) %>%
-        mutate(blue = as.numeric(log2 < -0.41 | log2 > 0.32),
+        dplyr::mutate(log2 = mean_log2, m = (s+e)/2) %>%
+        dplyr::mutate(cn = round((2^log2)*2)) %>%
+        dplyr::mutate(blue = as.numeric(log2 < -0.41 | log2 > 0.32),
                copies = ifelse(cn == 1, " copy", " copies"))
       probe_by_gene$loh <- rep(NULL, nrow(probe_by_gene))
-      probe_by_gene$total_weight <- rescale(probe_by_gene$total_weight, c(5,25))
+      probe_by_gene$total_weight <- scales::rescale(probe_by_gene$total_weight, c(5,25))
     } else probe_by_gene <- data.frame()
 
     # ensuring log2 values stay in bounds of plot, will not change integer copy number that is displayed
@@ -174,9 +192,9 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     # if gene data does not have weight, take weight from number of probes
     if(nrow(probe_by_gene) > 0 & !("weight" %in% colnames(gene_data))){
-      gene_data <- left_join(gene_data, (probe_by_gene %>% select(gene, chr, total_weight)), by = c("gene", "chr"))
+      gene_data <- left_join(gene_data, (probe_by_gene %>% dplyr::select(gene, chr, total_weight)), by = c("gene", "chr"))
       gene_data$total_weight <- ifelse(is.na(gene_data$total_weight), 1, gene_data$total_weight)
-      gene_data <- gene_data %>% mutate(weight = total_weight)
+      gene_data <- gene_data %>% dplyr::mutate(weight = total_weight)
     }
 
     # highlight segments that are outside of tumor ploidy; if none supplied, use ploidy of 2
@@ -195,13 +213,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         # use gene data
         if(length(unique(gene_data$gene))<500){sizeref = 0.25} else{sizeref = 0.7}
         if("weight" %in% colnames(gene_data)){
-          gene_data$total_weight <- rescale(gene_data$weight, c(5,25))
+          gene_data$total_weight <- scales::rescale(gene_data$weight, c(5,25))
         } else {
           gene_data$total_weight <- rep(10, nrow(gene_data))
         }
         chr <- filter(gene_data, chr == chromosomes[i])
         if(nrow(snv_data)>0){
-          chr <- chr %>% left_join(snv_data %>% group_by(gene) %>% summarise(mutation_present = TRUE), by = "gene")
+          chr <- chr %>% left_join(snv_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
           chr$mutation_present <- ifelse(is.na(chr$mutation_present), FALSE, TRUE)
         } else chr$mutation_present <- rep(FALSE, nrow(chr))
         if(!("loh" %in% colnames(gene_data))){
@@ -216,7 +234,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         } else{ sizeref = 0.7 }
         chr <- filter(probe_by_gene, chr == chromosomes[i])
         if(nrow(snv_data)>0){
-          chr <- chr %>% left_join(snv_data %>% group_by(gene) %>% summarise(mutation_present = TRUE), by = "gene")
+          chr <- chr %>% left_join(snv_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
           chr$mutation_present <- ifelse(is.na(chr$mutation_present), FALSE, TRUE)
         } else chr$mutation_present <- rep(FALSE, nrow(chr))
         chr$loh <- rep(FALSE, nrow(chr))
@@ -244,7 +262,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         assign(paste0(chromosomes[i], "_seg"), chr_seg)
       } else assign(paste0(chromosomes[i], "_seg"), data.frame())
 
-      out_of_range <- ifelse(get(chromosomes[i])$cn > 64, " - log-2 value outside range of y axis", "") # flagging points that were brough into view
+      out_of_range <- ifelse(get(chromosomes[i])$cn > 64, " - log-2 outside range of y axis", "") # flagging points that were brough into view
 
       plot <- plot_ly(source = "a", type = 'scatter', mode = 'markers') %>%
         add_trace(x = get(chromosomes[i])$m,
@@ -278,15 +296,15 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         }
       }
 
-      cytoband_chrom <- filter(CNViz::cytoband_data, chrom == chromosomes[i])
+      cytoband_chrom <- dplyr::filter(CNViz::cytoband_data, chrom == chromosomes[i])
 
-      subplot <- plot %>% layout(
+      subplot <- plot %>% plotly::layout(
         annotations = list(x = 40e6 , y = 6, text = chromosomes[i], showarrow= F),
         xaxis = list(range = c(0, 250e6), dtick = 100e6), yaxis = list(range(-3,6)))
 
       chr_plot <- plot %>%
         add_trace(x = cytoband_chrom$chromStart, y = 6, xaxis = 'x2', showlegend = F, marker = list(size = 0.1), hoverinfo = 'skip') %>%
-        layout(title = gsub("adj_", "", chromosomes[i]),
+        plotly::layout(title = gsub("adj_", "", chromosomes[i]),
                xaxis = list(range = c(0, max(cytoband_chrom$chromEnd)), zeroline = TRUE, showline = TRUE),
                xaxis2 = list(range = c(0, max(cytoband_chrom$chromEnd)),
                              ticktext = as.list(cytoband_chrom$name), tickvals = as.list(cytoband_chrom$chromStart),
@@ -299,7 +317,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     }
 
-    all_plot <- subplot(chr1_subplot, chr2_subplot, chr3_subplot,
+    all_plot <- plotly::subplot(chr1_subplot, chr2_subplot, chr3_subplot,
                         chr4_subplot, chr5_subplot, chr6_subplot,
                         chr7_subplot, chr8_subplot, chr9_subplot,
                         chr10_subplot, chr11_subplot, chr12_subplot,
@@ -366,7 +384,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     probe_sizes <- reactive({
       if(nrow(probe_data_select()) > 1){
         probe_data_select()$total_weight
-      } else if(nrow(probe_data_select()) == 1){
+      } else if(nrow(probe_data()$select) == 1){
         10
       }
     })
@@ -414,11 +432,11 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     # mutation table
     output$mutations <- DT::renderDataTable({
       if(nrow(gene_snvs()) > 0){
-        return(datatable(gene_snvs(),
+        return(DT::datatable(gene_snvs(),
                          escape = FALSE,
                          rownames = FALSE,
                          options = list(dom = 't', columnDefs = list(list(className = 'dt-center')))) %>%
-                 formatStyle(c(1:dim(gene_snvs())[2]), border = '1px solid #ddd'))
+                 DT::formatStyle(c(1:dim(gene_snvs())[2]), border = '1px solid #ddd'))
       } else return(data.frame())
     })
 
@@ -432,7 +450,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     if(exists("cbio")){
       cbio_studyId <- reactive({CNViz::cbio_studies$studyId[CNViz::cbio_studies$Cancer == input$cancer]})
       cbio_table <- reactive({
-        getDataByGenePanel(api = cbio,
+        cBioPortalData::getDataByGenePanel(api = cbio,
                            studyId = cbio_studyId(),
                            genePanelId = "IMPACT468",
                            molecularProfileId = paste0(cbio_studyId(), "_gistic"),
@@ -441,13 +459,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       cbio_dat <- reactive({ data.frame(cbio_table()[[1]], stringsAsFactors = FALSE) })
       output$cbioOutput <- DT::renderDataTable({
         req(nchar(input$cancer)>0)
-        datatable(cbio_dat() %>% group_by(hugoGeneSymbol) %>%
-                    summarise(Gain = sum(value ==1)/n(),
+        DT::datatable(cbio_dat() %>% dplyr::group_by(hugoGeneSymbol) %>%
+                    dplyr::summarise(Gain = sum(value ==1)/n(),
                               Amplification = sum(value == 2)/n(),
                               ShallowDeletion = sum(value == -1)/n(),
                               DeepDeletion = sum(value == -2)/n()),
                   rownames = FALSE) %>%
-          formatPercentage(c("Gain", "Amplification", "ShallowDeletion", "DeepDeletion"), 2)
+          DT::formatPercentage(c("Gain", "Amplification", "ShallowDeletion", "DeepDeletion"), 2)
       })
     }
 
@@ -457,24 +475,24 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         output$karyotype <- downloadHandler(
           filename = paste0(sample_name, "_karyotype.pdf"),
           content = function(file) {
-            karyo_data <- segment_data %>% select(chr, start, end, log2, loh) %>% mutate(cn = round(2^log2*2)) %>% filter(cn != 2)
-            granges <- makeGRangesFromDataFrame(karyo_data, keep.extra.columns = TRUE, ignore.strand = TRUE)
+            karyo_data <- segment_data %>% dplyr::select(chr, start, end, log2, loh) %>% dplyr::mutate(cn = round(2^log2*2)) %>% dplyr::filter(cn != 2)
+            granges <- GenomicRanges::makeGRangesFromDataFrame(karyo_data, keep.extra.columns = TRUE, ignore.strand = TRUE)
             pdf(file)
-            kp <- plotKaryotype("hg38", plot.type = 2)
-            plotCopyNumberCalls(kp, cn.calls = granges, labels = "", label.cex = 0, cn.colors = "red_blue", loh.color = "green")
-            legend(x = "bottomright", fill = c("blue", "red", "green"), legend = c("gain", "loss", "loh"), bty = "n")
+            kp <- karyoploteR::plotKaryotype("hg38", plot.type = 2)
+            CopyNumberPlots::plotCopyNumberCalls(kp, cn.calls = granges, labels = "", label.cex = 0, cn.colors = "red_blue", loh.color = "green")
+            graphics::legend(x = "bottomright", fill = c("blue", "red", "green"), legend = c("gain", "loss", "loh"), bty = "n")
             dev.off()
           })
       } else {
         output$karyotype <- downloadHandler(
           filename = "karyotype.pdf",
           content = function(file) {
-            karyo_data <- segment_data %>% select(chr, start, end, log2) %>% mutate(cn = round(2^log2*2)) %>% filter(cn != 2)
-            granges <- makeGRangesFromDataFrame(karyo_data, keep.extra.columns = TRUE, ignore.strand = TRUE)
+            karyo_data <- segment_data %>% dplyr::select(chr, start, end, log2) %>% dplyr::mutate(cn = round(2^log2*2)) %>% dplyr::filter(cn != 2)
+            granges <- GenomicRanges::makeGRangesFromDataFrame(karyo_data, keep.extra.columns = TRUE, ignore.strand = TRUE)
             pdf(file)
-            kp <- plotKaryotype("hg38", plot.type = 2)
-            plotCopyNumberCalls(kp, cn.calls = granges, labels = "", label.cex = 0, cn.colors = "red_blue")
-            legend(x = "bottomright", fill = c("blue", "red"), legend = c("gain", "loss"), bty = "n")
+            kp <- karyoploteR::plotKaryotype("hg38", plot.type = 2)
+            CopyNumberPlots::plotCopyNumberCalls(kp, cn.calls = granges, labels = "", label.cex = 0, cn.colors = "red_blue")
+            graphics::legend(x = "bottomright", fill = c("blue", "red"), legend = c("gain", "loss"), bty = "n")
             dev.off()
           })
       }
