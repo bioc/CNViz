@@ -18,13 +18,13 @@ launchCNViz(
 
 \item{probe_data}{A dataframe containing probe-level data. Column names must include chr, gene, start, end, log2. Optional column: weight.}
 
-\item{gene_data}{A dataframe containing gene-level data. Column names must include chr, gene, start, end, log2. Optional columns: weight, loh; where loh values are TRUE or FALSE}
+\item{gene_data}{A dataframe containing gene-level data - one row per gene. Column names must include chr, gene, start, end, log2. Optional columns: weight, loh; where loh values are TRUE or FALSE}
 
 \item{segment_data}{A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE}
 
 \item{snv_data}{A dataframe containg SNVs and columns of your choosing. The only required column is gene. Optional columns: start, mutation_id; where start indicates the starting position of the mutation and mutation_id is a string in any format. Additional columns might include depth, allelic_fraction.}
 
-\item{meta_data}{A dataframe containing your sample's metadata - columns of your choosing. Columns might include purity and ploidy. Ploidy will be rounded to the nearest whole number. This dataframe should only have one row.}
+\item{meta_data}{A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.}
 }
 \description{
 CNViz launches a shiny application to visualize your sample's copy number data.
