@@ -384,7 +384,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     probe_sizes <- reactive({
       if(nrow(probe_data_select()) > 1){
         probe_data_select()$total_weight
-      } else if(nrow(probe_data()$select) == 1){
+      } else if(nrow(probe_data_select()) == 1){
         10
       }
     })
