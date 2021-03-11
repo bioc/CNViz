@@ -66,22 +66,22 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                             conditionalPanel(condition = 'output.karyotype !== null', downloadButton("karyotype", "karyotype")),
                             br(), br(),
                             if(nrow(gene_data) > 0 | nrow(probe_data) > 0){
-                              img(src="https://drive.google.com/uc?id=1O7N-29KhIP_3XJbwiZU0oaYIsKmdquCD", width = "100%")
+                              img(src="https://cnviz.s3.amazonaws.com/markers.png", width = "100%")
                             },
                             if(nrow(snv_data) > 0){
-                              img(src="https://drive.google.com/uc?id=1j2DoM1FeqwVyvHvO89FGckm6Pbzog8Lp", width = "100%")
+                              img(src="https://cnviz.s3.amazonaws.com/mutation.png", width = "100%")
                             },
                             if("loh" %in% colnames(gene_data)){
-                              img(src="https://drive.google.com/uc?id=1a6iGa_rmU6YE-T80Crs9bObiZjhk-Lkw", width = "100%")
+                              img(src="https://cnviz.s3.amazonaws.com/marker_loh.png", width = "100%")
                             },
                             if("loh" %in% colnames(gene_data) & nrow(snv_data) > 0){
-                              img(src="https://drive.google.com/uc?id=19uYesXd3LLBqNkzT8Bezs2GoF57XbX0H", width = "100%")
+                              img(src="https://cnviz.s3.amazonaws.com/mutation_loh.png", width = "100%")
                             },
                             if(nrow(segment_data) > 0){
-                              img(src="https://drive.google.com/uc?id=1KN1iHnlxM21K2IYH4m2Mt2ScCk2MTEtf", width = "100%")
+                              img(src="https://cnviz.s3.amazonaws.com/segment.png", width = "100%")
                             },
                             if("loh" %in% colnames(segment_data)){
-                              img(src="https://drive.google.com/uc?id=12xmqyd_m8c83MKdxGpTeW9BUTe9Jed10", width = "100%")
+                              img(src="https://cnviz.s3.amazonaws.com/segment_loh.png", width = "100%")
                             }
                           ),
                           mainPanel(
@@ -475,24 +475,28 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         output$karyotype <- downloadHandler(
           filename = paste0(sample_name, "_karyotype.pdf"),
           content = function(file) {
-            karyo_data <- segment_data %>% dplyr::select(chr, start, end, log2, loh) %>% dplyr::mutate(cn = round(2^log2*2)) %>% dplyr::filter(cn != 2)
+            karyo_data <- segment_data %>% dplyr::select(chr, start, end, log2, loh) %>% dplyr::mutate(cn = round(2^log2*2))
+            karyo_data$cn <- ifelse(karyo_data$cn > 6, 6, karyo_data$cn)
             granges <- GenomicRanges::makeGRangesFromDataFrame(karyo_data, keep.extra.columns = TRUE, ignore.strand = TRUE)
             pdf(file)
             kp <- karyoploteR::plotKaryotype("hg38", plot.type = 2)
             CopyNumberPlots::plotCopyNumberCalls(kp, cn.calls = granges, labels = "", label.cex = 0, cn.colors = "red_blue", loh.color = "green")
-            graphics::legend(x = "bottomright", fill = c("blue", "red", "green"), legend = c("gain", "loss", "loh"), bty = "n")
+            graphics::legend(x = "bottomright", fill = c("#EE0000", "#FFC1C1", "#E0E0E0", "#B2DFEE", "#87CEFA", "#1E90FF", "#0000FF", "green"),
+                             legend = c("0", "1", "2", "3", "4", "5", "6+", "loh"), title = "copies", bty = "n")
             dev.off()
           })
       } else {
         output$karyotype <- downloadHandler(
           filename = "karyotype.pdf",
           content = function(file) {
-            karyo_data <- segment_data %>% dplyr::select(chr, start, end, log2) %>% dplyr::mutate(cn = round(2^log2*2)) %>% dplyr::filter(cn != 2)
+            karyo_data <- segment_data %>% dplyr::select(chr, start, end, log2) %>% dplyr::mutate(cn = round(2^log2*2))
+            karyo_data$cn <- ifelse(karyo_data$cn > 6, 6, karyo_data$cn)
             granges <- GenomicRanges::makeGRangesFromDataFrame(karyo_data, keep.extra.columns = TRUE, ignore.strand = TRUE)
             pdf(file)
             kp <- karyoploteR::plotKaryotype("hg38", plot.type = 2)
             CopyNumberPlots::plotCopyNumberCalls(kp, cn.calls = granges, labels = "", label.cex = 0, cn.colors = "red_blue")
-            graphics::legend(x = "bottomright", fill = c("blue", "red"), legend = c("gain", "loss"), bty = "n")
+            graphics::legend(x = "bottomright", fill = c("#EE0000", "#FFC1C1", "#E0E0E0", "#B2DFEE", "#87CEFA", "#1E90FF", "#0000FF"),
+                             legend = c("0", "1", "2", "3", "4", "5", "6+"), title = "copies", bty = "n")
             dev.off()
           })
       }
