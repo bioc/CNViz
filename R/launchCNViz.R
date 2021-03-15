@@ -5,29 +5,29 @@
 #' sample_name, snv_data and meta_data are all optional.
 #'
 #' @param sample_name A string with the ID/name of your sample.
-#' @param probe_data A dataframe containing probe-level data. Column names must include chr, gene, start, end, log2. Optional column: weight.
-#' @param gene_data A dataframe containing gene-level data - one row per gene. Column names must include chr, gene, start, end, log2. Optional columns: weight, loh; where loh values are TRUE or FALSE
-#' @param segment_data A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE
+#' @param probe_data A dataframe containing probe-level data. Column names must include chr, gene, start, end, log2. Optional column: weight. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
+#' @param gene_data A dataframe containing gene-level data - one row per gene. Column names must include chr, gene, start, end, log2. Optional columns: weight, loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
+#' @param segment_data A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
 #' @param snv_data A dataframe containg SNVs and columns of your choosing. The only required column is gene. Optional columns: start, mutation_id; where start indicates the starting position of the mutation and mutation_id is a string in any format. Additional columns might include depth, allelic_fraction.
 #' @param meta_data A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.
 #'
+#' @return a Shiny application
+#'
 #' @import shiny
-#' @import stats
 #' @import utils
 #' @importFrom grDevices dev.off pdf
 #' @importFrom dplyr select filter summarise mutate left_join group_by n between
+#' @import stats
 #' @importFrom plotly plot_ly add_segments add_trace layout renderPlotly plotlyOutput event_data subplot
 #' @importFrom karyoploteR plotKaryotype
 #' @importFrom CopyNumberPlots plotCopyNumberCalls
 #' @importFrom GenomicRanges makeGRangesFromDataFrame
 #' @importFrom magrittr %>%
 #' @importFrom cBioPortalData cBioPortal getDataByGenePanel
-#' @importFrom DT dataTableOutput renderDataTable formatPercentage datatable formatStyle
+#' @importFrom DT DTOutput renderDT formatPercentage datatable formatStyle
 #' @importFrom scales rescale
 #' @importFrom graphics legend
 #'
-#' @export cbio_studies
-#' @export cytoband_data
 #' @export launchCNViz
 #'
 
@@ -69,7 +69,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                             if(nrow(gene_data) > 0 | nrow(probe_data) > 0){
                               img(src="https://cnviz.s3.amazonaws.com/markers.png", width = "100%")
                             },
-                            if(nrow(snv_data) > 0){
+                            if(nrow(snv_data) > 0 & (nrow(gene_data) + nrow(probe_data) > 0)){
                               img(src="https://cnviz.s3.amazonaws.com/mutation.png", width = "100%")
                             },
                             if("loh" %in% colnames(gene_data)){
@@ -92,16 +92,17 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                             plotlyOutput("chr_plot", width = "100%"),
                             conditionalPanel("input.chr != 'all'",
                                              column(10, offset = 1,
-                                                    strong(textOutput("gene_text")), br(),
-                                                    conditionalPanel("output.selected_plot", plotlyOutput("selected_plot")), br(),
-                                                    dataTableOutput("mutations"), style = 'padding:20px'))
+                                                    h4(textOutput("gene_text")), br(),
+                                                    DTOutput("mutations"), br(),
+                                                    plotlyOutput("selected_plot"), br(),
+                                                    style = 'padding:20px'))
                           )
                         )),
                tabPanel("TCGA Pan-Cancer Atlas 2018 Data", fluid=TRUE,
                         selectizeInput(inputId = "cancer", label = "cancer",
                                        choices = c("", CNViz::cbio_studies$Cancer),
                                        selected = ""),
-                        dataTableOutput("cbioOutput")),
+                        DTOutput("cbioOutput")),
                tabPanel(icon("info-circle", class = NULL, lib = "font-awesome"),
                         fluid=TRUE,
                         h5("Patient Data"),
@@ -267,6 +268,8 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
       out_of_range <- ifelse(get(chromosomes[i])$cn > 64, " - log-2 outside range of y axis", "") # flagging points that were brough into view
 
+      xmax <- max(filter(CNViz::cytoband_data, chrom == chromosomes[i])$chromEnd)
+
       plot <- plot_ly(source = "a", type = 'scatter', mode = 'markers') %>%
         add_trace(x = get(chromosomes[i])$m,
                   y = get(chromosomes[i])$log2,
@@ -277,15 +280,15 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                                 size = get(chromosomes[i])$total_weight,
                                 sizemode = 'area',
                                 sizeref = ifelse(exists("sizeref"), sizeref, 1)),
-                  showlegend = F) %>%
-        add_segments(x = 0, xend = max(c(get(chromosomes[i])$m,0)),
-                     y = log((ploidy-0.5)/2, 2), yend = log((ploidy-0.5)/2, 2), line = list(color = "gray", width = 1, dash = "dot"), showlegend = F) %>%
-        add_segments(x = 0, xend = max(c(get(chromosomes[i])$m,0)),
-                     y = log((ploidy+0.5)/2, 2), yend = log((ploidy+0.5)/2, 2), line = list(color = "gray", width = 1, dash = "dot"), showlegend = F) %>%
+                  showlegend = FALSE) %>%
+        add_segments(x = 0, xend = xmax,
+                     y = log((ploidy-0.5)/2, 2), yend = log((ploidy-0.5)/2, 2), line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
+        add_segments(x = 0, xend = xmax,
+                     y = log((ploidy+0.5)/2, 2), yend = log((ploidy+0.5)/2, 2), line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
         layout(yaxis=list(title = "log(2) copy number ratio",
                           titlefont = list(size = 8),
                           range = c(-3.5, 6)),
-               xaxis= list(range = c(0,250e6)))
+               xaxis= list(range = c(0,xmax)))
 
       if(nrow(get(paste0(chromosomes[i], "_seg")))>0){
         for(j in 1:nrow(get(paste0(chromosomes[i], "_seg")))){
@@ -295,18 +298,18 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                                         yend = get(paste0(chromosomes[i], "_seg"))$log2[j],
                                         text = paste0("segment (", get(paste0(chromosomes[i], "_seg"))$start[j], "-", get(paste0(chromosomes[i], "_seg"))$end[j], ")"),
                                         hoverinfo = 'text',
-                                        line = list(color = get(paste0(chromosomes[i], "_seg"))$seg_color[j], width = 3), showlegend = F)
+                                        line = list(color = get(paste0(chromosomes[i], "_seg"))$seg_color[j], width = 3), showlegend = FALSE)
         }
       }
 
       cytoband_chrom <- dplyr::filter(CNViz::cytoband_data, chrom == chromosomes[i])
 
       subplot <- plot %>% plotly::layout(
-        annotations = list(x = 40e6 , y = 6, text = chromosomes[i], showarrow= F),
+        annotations = list(x = 40e6 , y = 6, text = chromosomes[i], showarrow= FALSE),
         xaxis = list(range = c(0, 250e6), dtick = 100e6), yaxis = list(range(-3.5,6)))
 
       chr_plot <- plot %>%
-        add_trace(x = cytoband_chrom$chromStart, y = 6, xaxis = 'x2', showlegend = F, marker = list(size = 0.1), hoverinfo = 'skip') %>%
+        add_trace(x = cytoband_chrom$chromStart, y = 6, xaxis = 'x2', showlegend = FALSE, marker = list(size = 0.1), hoverinfo = 'skip') %>%
         plotly::layout(title = gsub("adj_", "", chromosomes[i]),
                        xaxis = list(range = c(0, max(cytoband_chrom$chromEnd)), zeroline = TRUE, showline = TRUE),
                        xaxis2 = list(range = c(0, max(cytoband_chrom$chromEnd)),
@@ -329,7 +332,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                                 chr19_subplot, chr20_subplot, chr21_subplot,
                                 chr22_subplot, chrX_subplot, chrY_subplot,
                                 nrows=9, shareY = TRUE, shareX = TRUE) %>%
-      layout(autosize = F, height = 1200)
+      layout(autosize = FALSE, height = 1200)
 
     plot_todisplay <- reactive({ get(paste0(input$chr, "_plot")) })
 
@@ -362,23 +365,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       } else data.frame()
     })
 
-    probe_plot_title <- reactive({
-      if(nrow(gene_data) > 0 & "loh" %in% colnames(gene_data)){
-        paste0("probe data: ", input$gene, " (",
-               gene_data[gene_data$gene == input$gene,]$cn[1], " ",
-               gene_data[gene_data$gene == input$gene,]$copies[1],
-               ifelse(gene_data[gene_data$gene == input$gene,]$loh[1] == TRUE, ", LOH)", ")"))
-      }else if(nrow(gene_data) > 0) {
-        paste0("probe data: ", input$gene, " (",
-               gene_data[gene_data$gene == input$gene,]$cn[1], " ",
-               gene_data[gene_data$gene == input$gene,]$copies[1], ")")
-      }else{
-        paste0("probe data: ", input$gene, " (",
-               probe_by_gene[probe_by_gene$gene == input$gene,]$cn[1], " ",
-               probe_by_gene[probe_by_gene$gene == input$gene,]$copies[1], ")")
-      }
-
-    })
+    probe_plot_title <- reactive({ paste0("probe data: ", input$gene) })
 
     probe_data_check <- reactive({ nrow(probe_data_select()) > 0 })
 
@@ -404,7 +391,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                     size = probe_sizes(),
                     sizemode = "area",
                     sizeref = ifelse(exists("probe_sizeref"), probe_sizeref, 1)),
-                  showlegend = F) %>%
+                  showlegend = FALSE) %>%
         add_trace(x = as.numeric(snv_data_select()$start),
                   y = rep(0, nrow(snv_data_select())),
                   marker=list(
@@ -413,9 +400,9 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                     color = 'black'),
                   text = snv_data_select()$mutation_id,
                   hoverinfo = 'text',
-                  showlegend = F) %>%
-        add_segments(x = min(probe_data_select()$start), xend = max(probe_data_select()$end), y = -0.41, yend = -0.41, line = list(color = "gray", width = 1, dash = "dot"), showlegend = F) %>%
-        add_segments(x = min(probe_data_select()$start), xend = max(probe_data_select()$end), y = 0.32, yend = 0.32, line = list(color = "gray", width = 1, dash = "dot"), showlegend = F) %>%
+                  showlegend = FALSE) %>%
+        add_segments(x = min(probe_data_select()$start), xend = max(probe_data_select()$end), y = -0.41, yend = -0.41, line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
+        add_segments(x = min(probe_data_select()$start), xend = max(probe_data_select()$end), y = 0.32, yend = 0.32, line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
         layout(
           title = probe_plot_title(),
           xaxis = list(tickfont = list(size = 6), range = min(probe_data_select()$s), max(probe_data_select()$e)),
@@ -437,10 +424,19 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         paste0(input$gene, " (", round(filter(gene_data, gene == input$gene)$start/1e6,2), "M", "-", round(filter(gene_data, gene == input$gene)$end/1e6,2), "M", ")", ": ",
                round(filter(gene_data, gene == input$gene)$cn,2),
                ifelse(filter(gene_data, gene == input$gene)$cn == 1, " copy", " copies"))
-      } else(paste0(""))
+      } else if(nrow(gene_data) > 0 & nchar(input$gene) > 1){
+        paste0(input$gene, ": ",
+               round(filter(gene_data, gene == input$gene)$cn,2),
+               ifelse(filter(gene_data, gene == input$gene)$cn == 1, " copy", " copies"))
+      } else if (nrow(probe_data) > 0 & nchar(input$gene) > 1){
+        paste0(input$gene, ": ",
+               round(probe_by_gene[probe_by_gene$gene == input$gene,]$cn[1], 2),
+               ifelse(round(probe_by_gene[probe_by_gene$gene == input$gene,]$cn[1],2) == 1, " copy", " copies"))
+      }
+      else{ paste0("") }
     })
     loh_text <- eventReactive(input$gene,{
-      if(nrow(gene_data) > 0 & nrow(probe_data) == 0 & nchar(input$gene) > 1){
+      if(nrow(gene_data) > 0 & nchar(input$gene) > 1){
         if("loh" %in% colnames(gene_data)){
           ifelse(filter(gene_data, gene == input$gene)$loh == TRUE, ", LOH", "")
         } else paste0("")
@@ -449,7 +445,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     output$gene_text <- reactive({ paste0(cn_text(), loh_text()) })
 
     # mutation table
-    output$mutations <- DT::renderDataTable({
+    output$mutations <- DT::renderDT({
       if(nrow(gene_snvs()) > 0){
         return(DT::datatable(gene_snvs(),
                              escape = FALSE,
@@ -476,7 +472,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                                            sampleListId = paste0(cbio_studyId(), "_cna"))
       })
       cbio_dat <- reactive({ data.frame(cbio_table()[[1]], stringsAsFactors = FALSE) })
-      output$cbioOutput <- DT::renderDataTable({
+      output$cbioOutput <- DT::renderDT({
         req(nchar(input$cancer)>0)
         DT::datatable(cbio_dat() %>% dplyr::group_by(hugoGeneSymbol) %>%
                         dplyr::summarise(Gain = sum(value ==1)/n(),
