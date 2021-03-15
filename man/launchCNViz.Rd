@@ -14,7 +14,7 @@ launchCNViz(
 )
 }
 \arguments{
-\item{sample_name}{A string with the ID of your sample.}
+\item{sample_name}{A string with the ID/name of your sample.}
 
 \item{probe_data}{A dataframe containing probe-level data. Column names must include chr, gene, start, end, log2. Optional column: weight.}
 
@@ -29,5 +29,5 @@ launchCNViz(
 \description{
 CNViz launches a shiny application to visualize your sample's copy number data.
 At least one of probe_data, gene_data, or segment_data must be supplied;
-sample_name, meta_data, snv and karyotype_pdf are all optional.
+sample_name, snv_data and meta_data are all optional.
 }
