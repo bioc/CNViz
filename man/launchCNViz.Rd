@@ -22,7 +22,7 @@ launchCNViz(
 
 \item{segment_data}{A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.}
 
-\item{snv_data}{A dataframe containg SNVs and columns of your choosing. The only required column is gene. Optional columns: start, mutation_id; where start indicates the starting position of the mutation and mutation_id is a string in any format. Additional columns might include depth, allelic_fraction.}
+\item{snv_data}{A dataframe containg SNVs and columns of your choosing. The only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. Additional columns might include depth, allelic_fraction.}
 
 \item{meta_data}{A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.}
 }
@@ -32,5 +32,23 @@ a Shiny application
 \description{
 CNViz launches a shiny application to visualize your sample's copy number data.
 At least one of probe_data, gene_data, or segment_data must be supplied;
-sample_name, snv_data and meta_data are all optional.
+sample_name, snv_data and meta_data are all optional. The more inputs supplied,
+the more informative the application will be. See the CNViz vignette for more information.
+}
+\examples{
+probes <- data.frame(chr = c("chr1", "chr1", "chr4", "chr4", "chrX"),
+gene = c("NOTCH2", "NOTCH2", "KIT", "TET2", "BTK"),
+start = c(119922221, 119967406,54732072,105243553,101360541),
+end = c(119922461,119967646,54732192,105243793,101360781),
+log2 = c(-0.0832403,-0.0578757,0.2131540,-0.3189430,-0.7876670),
+weight = c(0.684114, 0.681546,0.606129,0.682368,0.405772))
+segments <- data.frame(chr = c("chr1","chr1", "chr4", "chr4", "chrX"),
+start = c(1050069, 124932724,   1942322,  51743951,   1198732),
+end = c(122026459, 246947668,  49712061, 188110779,  37098762),
+log2 = c(1, 1, 1, 1, 0.5849625), loh = c(FALSE, FALSE, FALSE, TRUE, TRUE))
+meta <- data.frame(purity = c(.5),
+ploidy = c(2), sex = c("Female"))
+# launchCNViz(sample_name = "sample123", probe_data = probes,
+# segment_data = segments, meta_data = meta)
+
 }

@@ -1,0 +1,119 @@
+---
+title: "CNViz"
+author: "Rebecca Greenblatt (rebecca.greenblatt@gmail.com)"
+date: "3-23-21"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{CNViz}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(CNViz)
+```
+
+# Introduction
+Copy number data can be difficult to process when presented in a list format or as a tab-delimited file. When projected onto a scatterplot, large scale changes can be appreciated, but smaller, gene-level changes are often missed. CNViz takes copy number data, at the probe, gene and/or segment level, and launches an interactive shiny application to visualize your sample. Loss of heterozygosity (LOH) and single nucleotide variant (SNV) data can also be included. 
+
+# `launchCNViz`
+This function launches an interactive Shiny application with your copy number data. See detailed descriptions and examples for each input below. 
+
+## Input Data
+### `sample_name` 
+This should be a character string that identifies your sample "i.e. sample123"
+
+### `meta_data`
+This can include any information about your sample you would like. For example, you might include purity of the sample, ploidy, sex of patient, diagnosis, etc. It shoud only be one row. The only value that will be relevant to the visualization is ploidy. If not included, it will be assumed to be 2. 
+```{r, echo = FALSE}
+meta_data <- data.frame(purity = c(.5), ploidy = c(2), sex = c("Female"))
+```
+```{r}
+meta_data
+```
+
+### `probe_data`
+This should be a dataframe containing probe-level data. Therefore each row should have chromosome, corresponding gene, chromosomal starting location (hg38), chromosomal end location, and log-2 ratio. A weight column is optional, but if included should represent a level of confidence in the log-2 value. This dataframe will likely have hundreds to thousands of rows depending on how many genes you wish to include. Only one of probe_data, gene_data or segment_data is required, but having all will make the visualization more informative. 
+```{r, echo = FALSE}
+probe_data <- data.frame(chr = c("chr1", "chr1", "chr4", "chr4", "chrX"),
+                         gene = c("NOTCH2", "NOTCH2", "KIT", "TET2", "BTK"),
+                         start = c(119922221, 119967406,54732072,105243553,101360541),
+                         end = c(119922461,119967646,54732192,105243793,101360781),
+                         log2 = c(-0.0832403,-0.0578757,0.2131540,-0.3189430,-0.7876670),
+                         weight = c(0.684114, 0.681546,0.606129,0.682368,0.405772))
+```
+```{r}
+head(probe_data)
+```
+
+### `gene_data`
+This is similar to probe_data, however each row corresponds to a single gene. If your gene data comes with copy number estimate instead of log-2 ratio, you can convert copy number to log-2 with `log(C/2, 2)` where C is the copy number estimate. In the example below, the copy numbers were 4, 4, 4 and 0. You will notice 0 corresponds to a log-2 value of `-Inf`. Do not worry about this, the function will adjust these values so they appear on the plot. If your data does not come with weight values, and you have probe data available, you can use the number of probes targeted to that gene as the weight or the sum of the weights of all probes targeted to that gene (if your probe data has a weight column). This data frame can have an LOH columnm, indicating whether or not this gene is suspected to have loss of heterozyogisity - this column should take on values TRUE or FALSE.
+* If your probe data corresponds to raw/unadjusted values, and your gene data corresponds to values adjusted for tumor purity and/or ploidy, take note of this, and explain this to any users of the application. This is important because the log-2 values on the gene plot and probe plots may not align.
+    
+```{r, echo = FALSE}
+gene_data <- data.frame(chr = c("chr1","chr4", "chr4", "chrX"),
+                        gene = c("NOTCH2", "KIT", "TET2", "BTK"),
+                        start = c(119915280, 54657958, 105233869, 101349831),
+                        end = c(120069459, 54738612, 105276563, 101390603),
+                        log2 = c(1, 1, 1, -Inf),
+                        weight = c(40, 22, 26, 19),
+                        loh = c(FALSE, FALSE, TRUE, FALSE))
+```
+```{r}
+head(gene_data)
+```
+
+### `segment_data`
+Each row will correspond to a segment as shown below. An LOH column can be included in this dataframe as well, indicating whether or not the entire segment is suspected of having loss of heterozygosity.
+```{r, echo = FALSE}
+segment_data <- data.frame(chr = c("chr1","chr1", "chr4", "chr4", "chrX"),
+                        start = c(1050069, 124932724,   1942322,  51743951,   1198732),
+                        end = c(122026459, 246947668,  49712061, 188110779,  37098762),
+                        log2 = c(1, 1, 1, 1, 0.5849625),
+                        loh = c(FALSE, FALSE, FALSE, TRUE, TRUE))
+```
+```{r}
+head(segment_data)
+```
+
+### `snv_data`
+Each row will correspond to a singlue nucleotide variant (SNV). The gene, and mutation_id (in any format) must be included. Other columns like depth and starting location (start) are optional. If start is included, this will enable CNViz to plot the location of the mutation on the probe plot. 
+```{r, echo = FALSE}
+snv_data <- data.frame(gene = c("POT1", "FANCL", "NPM1", "PTEN"),
+                       mutation_id = c("chr7:124841116_C/G", "chr2:58165662_T/C", "chr5:171388123_G/T", "chr10:87931197_T/TTTATC"),
+                        start = c(124841116, 58165662,   171388123,  87931197),
+                        depth = c(485, 181, 1297, 218))
+```
+```{r}
+head(snv_data)
+```
+
+## Output
+```{r, eval = FALSE}
+launchCNViz(sample_name = "sample123", meta_data = meta_data, probe_data = probe_data, gene_data = gene_data, segment_data = segment_data, snv_data = snv_data)
+```
+This will launch a Shiny application. See https://rebeccagreenblatt.shinyapps.io/cnviz_example for a live example using simulated data. 
+* Note: if any of meta_data, probe_data, gene_data, segment_data or snv_data is not included, it will be set to an empty data frame (`data.frame()`). See `?launchCNViz` in the console. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

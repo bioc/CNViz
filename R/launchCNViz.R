@@ -2,13 +2,14 @@
 #'
 #' CNViz launches a shiny application to visualize your sample's copy number data.
 #' At least one of probe_data, gene_data, or segment_data must be supplied;
-#' sample_name, snv_data and meta_data are all optional.
+#' sample_name, snv_data and meta_data are all optional. The more inputs supplied,
+#' the more informative the application will be. See the CNViz vignette for more information.
 #'
 #' @param sample_name A string with the ID/name of your sample.
 #' @param probe_data A dataframe containing probe-level data. Column names must include chr, gene, start, end, log2. Optional column: weight. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
 #' @param gene_data A dataframe containing gene-level data - one row per gene. Column names must include chr, gene, start, end, log2. Optional columns: weight, loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
 #' @param segment_data A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
-#' @param snv_data A dataframe containg SNVs and columns of your choosing. The only required column is gene. Optional columns: start, mutation_id; where start indicates the starting position of the mutation and mutation_id is a string in any format. Additional columns might include depth, allelic_fraction.
+#' @param snv_data A dataframe containg SNVs and columns of your choosing. The only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. Additional columns might include depth, allelic_fraction.
 #' @param meta_data A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.
 #'
 #' @return a Shiny application
@@ -27,6 +28,22 @@
 #' @importFrom DT DTOutput renderDT formatPercentage datatable formatStyle
 #' @importFrom scales rescale
 #' @importFrom graphics legend
+#'
+#' @examples
+#' probes <- data.frame(chr = c("chr1", "chr1", "chr4", "chr4", "chrX"),
+#' gene = c("NOTCH2", "NOTCH2", "KIT", "TET2", "BTK"),
+#' start = c(119922221, 119967406,54732072,105243553,101360541),
+#' end = c(119922461,119967646,54732192,105243793,101360781),
+#' log2 = c(-0.0832403,-0.0578757,0.2131540,-0.3189430,-0.7876670),
+#' weight = c(0.684114, 0.681546,0.606129,0.682368,0.405772))
+#' segments <- data.frame(chr = c("chr1","chr1", "chr4", "chr4", "chrX"),
+#' start = c(1050069, 124932724,   1942322,  51743951,   1198732),
+#' end = c(122026459, 246947668,  49712061, 188110779,  37098762),
+#' log2 = c(1, 1, 1, 1, 0.5849625), loh = c(FALSE, FALSE, FALSE, TRUE, TRUE))
+#' meta <- data.frame(purity = c(.5),
+#' ploidy = c(2), sex = c("Female"))
+#' # launchCNViz(sample_name = "sample123", probe_data = probes,
+#' # segment_data = segments, meta_data = meta)
 #'
 #' @export launchCNViz
 #'
@@ -100,7 +117,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                         )),
                tabPanel("TCGA Pan-Cancer Atlas 2018 Data", fluid=TRUE,
                         selectizeInput(inputId = "cancer", label = "cancer",
-                                       choices = c("", CNViz::cbio_studies$Cancer),
+                                       choices = c("", cbio_studies$Cancer),
                                        selected = ""),
                         DTOutput("cbioOutput")),
                tabPanel(icon("info-circle", class = NULL, lib = "font-awesome"),
@@ -116,7 +133,9 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                         div(style="display: inline-block;", a("cBioPortal website,", target ="_blank", href = "https://www.cbioportal.org/")),
                         div(style="display: inline-block;", a("cBioPortal FAQ,", target ="_blank", href = "https://docs.cbioportal.org/1.-general/faq")),
                         div(style="display: inline-block;", a("cBioPortalData R Package,", target ="_blank", href = "https://bioconductor.org/packages/release/bioc/html/cBioPortalData.html")),
-                        div(style="display: inline-block;", a("GISTIC paper", target ="_blank", href = "https://pubmed.ncbi.nlm.nih.gov/18077431/")))
+                        div(style="display: inline-block;", a("GISTIC paper", target ="_blank", href = "https://pubmed.ncbi.nlm.nih.gov/18077431/")),
+                        br(), br(), br(), br(), br(), br(), br(),
+                        p(em("Code available at GitHub.com/rebeccagreenblatt/CNViz.")))
     )
   ),
   server <- function(input, output, session) {
@@ -268,7 +287,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
       out_of_range <- ifelse(get(chromosomes[i])$cn > 64, " - log-2 outside range of y axis", "") # flagging points that were brough into view
 
-      xmax <- max(filter(CNViz::cytoband_data, chrom == chromosomes[i])$chromEnd)
+      xmax <- max(filter(cytoband_data, chrom == chromosomes[i])$chromEnd)
 
       plot <- plot_ly(source = "a", type = 'scatter', mode = 'markers') %>%
         add_trace(x = get(chromosomes[i])$m,
@@ -302,7 +321,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         }
       }
 
-      cytoband_chrom <- dplyr::filter(CNViz::cytoband_data, chrom == chromosomes[i])
+      cytoband_chrom <- dplyr::filter(cytoband_data, chrom == chromosomes[i])
 
       subplot <- plot %>% plotly::layout(
         annotations = list(x = 40e6 , y = 6, text = chromosomes[i], showarrow= FALSE),
@@ -463,7 +482,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     # TCGA data tab
     if(exists("cbio")){
-      cbio_studyId <- reactive({CNViz::cbio_studies$studyId[CNViz::cbio_studies$Cancer == input$cancer]})
+      cbio_studyId <- reactive({cbio_studies$studyId[cbio_studies$Cancer == input$cancer]})
       cbio_table <- reactive({
         cBioPortalData::getDataByGenePanel(api = cbio,
                                            studyId = cbio_studyId(),
