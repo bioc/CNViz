@@ -18,7 +18,7 @@
 #' @import utils
 #' @importFrom grDevices dev.off pdf
 #' @importFrom dplyr select filter summarise mutate left_join group_by n between
-#' @import stats
+#' @rawNamespace import(stats, except = filter)
 #' @importFrom plotly plot_ly add_segments add_trace layout renderPlotly plotlyOutput event_data subplot
 #' @importFrom karyoploteR plotKaryotype
 #' @importFrom CopyNumberPlots plotCopyNumberCalls
@@ -224,9 +224,9 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     ploidy <- ifelse(is.null(meta_data$ploidy), 2, meta_data$ploidy)
     if(nrow(segment_data) > 0){
       if("loh" %in% colnames(segment_data)){
-        segment_data_sig <- filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2) | loh == TRUE)
+        segment_data_sig <- dplyr::filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2) | loh == TRUE)
       } else {
-        segment_data_sig <- filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2))
+        segment_data_sig <- dplyr::filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2))
       }
     } else segment_data_sig <- data.frame()
 
@@ -240,7 +240,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         } else {
           gene_data$total_weight <- rep(10, nrow(gene_data))
         }
-        chr <- filter(gene_data, chr == chromosomes[i])
+        chr <- dplyr::filter(gene_data, chr == chromosomes[i])
         if(nrow(snv_data)>0){
           chr <- chr %>% left_join(snv_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
           chr$mutation_present <- ifelse(is.na(chr$mutation_present), FALSE, TRUE)
@@ -255,7 +255,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         if(length(unique(probe_data$gene))<500){
           probe_sizeref = 0.4
         } else{ probe_sizeref = 0.7 }
-        chr <- filter(probe_by_gene, chr == chromosomes[i])
+        chr <- dplyr::filter(probe_by_gene, chr == chromosomes[i])
         if(nrow(snv_data)>0){
           chr <- chr %>% left_join(snv_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
           chr$mutation_present <- ifelse(is.na(chr$mutation_present), FALSE, TRUE)
@@ -281,13 +281,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       }
 
       if(nrow(segment_data_sig) > 0){
-        chr_seg <- filter(segment_data_sig, chr == chromosomes[i])
+        chr_seg <- dplyr::filter(segment_data_sig, chr == chromosomes[i])
         assign(paste0(chromosomes[i], "_seg"), chr_seg)
       } else assign(paste0(chromosomes[i], "_seg"), data.frame())
 
       out_of_range <- ifelse(get(chromosomes[i])$cn > 64, " - log-2 outside range of y axis", "") # flagging points that were brough into view
 
-      xmax <- max(filter(cytoband_data, chrom == chromosomes[i])$chromEnd)
+      xmax <- max(dplyr::filter(cytoband_data, chrom == chromosomes[i])$chromEnd)
 
       plot <- plot_ly(source = "a", type = 'scatter', mode = 'markers') %>%
         add_trace(x = get(chromosomes[i])$m,
@@ -374,13 +374,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     probe_data_select <- eventReactive(input$gene,{
       if(nrow(probe_data)>0){
-        filter(probe_data, gene == input$gene)
+        dplyr::filter(probe_data, gene == input$gene)
       } else data.frame()
     })
 
     snv_data_select <- eventReactive(input$gene,{
       if(nrow(snv_data)>0 & "start" %in% colnames(snv_data)){
-        filter(snv_data, gene == input$gene)
+        dplyr::filter(snv_data, gene == input$gene)
       } else data.frame()
     })
 
@@ -433,20 +433,20 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
 
     gene_snvs <- eventReactive(input$gene,{
       if(nrow(snv_data) > 0){
-        return(filter(snv_data, gene == input$gene))
+        return(dplyr::filter(snv_data, gene == input$gene))
       } else return(data.frame())
     })
 
     # if no probe data/plot, display text with copy number & loh information
     cn_text <- eventReactive(input$gene,{
       if(nrow(gene_data) > 0 & nrow(probe_data) == 0 & nchar(input$gene) > 1){
-        paste0(input$gene, " (", round(filter(gene_data, gene == input$gene)$start/1e6,2), "M", "-", round(filter(gene_data, gene == input$gene)$end/1e6,2), "M", ")", ": ",
-               round(filter(gene_data, gene == input$gene)$cn,2),
-               ifelse(filter(gene_data, gene == input$gene)$cn == 1, " copy", " copies"))
+        paste0(input$gene, " (", round(dplyr::filter(gene_data, gene == input$gene)$start/1e6,2), "M", "-", round(dplyr::filter(gene_data, gene == input$gene)$end/1e6,2), "M", ")", ": ",
+               round(dplyr::filter(gene_data, gene == input$gene)$cn,2),
+               ifelse(dplyr::filter(gene_data, gene == input$gene)$cn == 1, " copy", " copies"))
       } else if(nrow(gene_data) > 0 & nchar(input$gene) > 1){
         paste0(input$gene, ": ",
-               round(filter(gene_data, gene == input$gene)$cn,2),
-               ifelse(filter(gene_data, gene == input$gene)$cn == 1, " copy", " copies"))
+               round(dplyr::filter(gene_data, gene == input$gene)$cn,2),
+               ifelse(dplyr::filter(gene_data, gene == input$gene)$cn == 1, " copy", " copies"))
       } else if (nrow(probe_data) > 0 & nchar(input$gene) > 1){
         paste0(input$gene, ": ",
                round(probe_by_gene[probe_by_gene$gene == input$gene,]$cn[1], 2),
@@ -457,7 +457,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     loh_text <- eventReactive(input$gene,{
       if(nrow(gene_data) > 0 & nchar(input$gene) > 1){
         if("loh" %in% colnames(gene_data)){
-          ifelse(filter(gene_data, gene == input$gene)$loh == TRUE, ", LOH", "")
+          ifelse(dplyr::filter(gene_data, gene == input$gene)$loh == TRUE, ", LOH", "")
         } else paste0("")
       }
     })

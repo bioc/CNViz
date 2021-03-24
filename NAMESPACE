@@ -2,7 +2,7 @@
 
 export(launchCNViz)
 import(shiny)
-import(stats)
+import(stats, except = filter)
 import(utils)
 importFrom(CopyNumberPlots,plotCopyNumberCalls)
 importFrom(DT,DTOutput)
