@@ -4,12 +4,13 @@
 #' At least one of probe_data, gene_data, or segment_data must be supplied;
 #' sample_name, snv_data and meta_data are all optional. The more inputs supplied,
 #' the more informative the application will be. See the CNViz vignette for more information.
+#' Use the hg38 reference genome. CNViz only displays a single sample's data.
 #'
 #' @param sample_name A string with the ID/name of your sample.
-#' @param probe_data A dataframe containing probe-level data. Column names must include chr, gene, start, end, log2. Optional column: weight. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
-#' @param gene_data A dataframe containing gene-level data - one row per gene. Column names must include chr, gene, start, end, log2. Optional columns: weight, loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
-#' @param segment_data A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.
-#' @param snv_data A dataframe containg SNVs and columns of your choosing. The only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. Additional columns might include depth, allelic_fraction.
+#' @param probe_data A dataframe or GRanges object containing probe-level data. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional column/metadata: weight, where weight is numeric.
+#' @param gene_data A dataframe or GRanges object containing gene-level data - one row per gene. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional columns/metadata: weight, loh; where weight is numeric and loh values are TRUE or FALSE.
+#' @param segment_data A dataframe or GRanges object containing segment-level data. If a dataframe, column names must include chr, start, end, log2. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional column/metadata: loh; where loh values are TRUE or FALSE.
+#' @param snv_data A dataframe or VRanges object containg SNVs and columns of your choosing. If a dataframe, the only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. If a VRanges object, make sure gene is one of the metadata columns, so it can be tied to the gene or probe data; a mutation_id column can also be included, otherwise it will be constructed. Additional columns might include depth, allelic_fraction.
 #' @param meta_data A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.
 #'
 #' @return a Shiny application
@@ -24,10 +25,10 @@
 #' @importFrom CopyNumberPlots plotCopyNumberCalls
 #' @importFrom GenomicRanges makeGRangesFromDataFrame
 #' @importFrom magrittr %>%
-#' @importFrom cBioPortalData cBioPortal getDataByGenePanel
 #' @importFrom DT DTOutput renderDT formatPercentage datatable formatStyle
 #' @importFrom scales rescale
 #' @importFrom graphics legend
+#' @importFrom GenomicRanges seqnames width strand
 #'
 #' @examples
 #' probes <- data.frame(chr = c("chr1", "chr1", "chr4", "chr4", "chrX"),
@@ -42,26 +43,46 @@
 #' log2 = c(1, 1, 1, 1, 0.5849625), loh = c(FALSE, FALSE, FALSE, TRUE, TRUE))
 #' meta <- data.frame(purity = c(.5),
 #' ploidy = c(2), sex = c("Female"))
-#' # launchCNViz(sample_name = "sample123", probe_data = probes,
-#' # segment_data = segments, meta_data = meta)
+#' \donttest{
+#' launchCNViz(sample_name = "sample123", probe_data = probes,
+#' segment_data = segments, meta_data = meta)
+#' }
 #'
 #' @export launchCNViz
 #'
 
 launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_data = data.frame(), segment_data = data.frame(), snv_data = data.frame(), meta_data = data.frame()) {
 
-  cbio <- cBioPortal()
+  if(is(probe_data, "GRanges")){
+    probe_data <- as.data.frame(probe_data)
+    probe_data$chr <- probe_data$seqnames
+  }
+  if(is(gene_data, "GRanges")){
+    gene_data <- as.data.frame(gene_data)
+    gene_data$chr <- gene_data$seqnames
+  }
+  if(is(segment_data,"GRanges")){
+    segment_data <- as.data.frame(segment_data)
+    segment_data$chr <- segment_data$seqnames
+  }
+  if(is(snv_data, "VRanges")){
+    snv_data <- as.data.frame(snv_data)
+    if(!("mutation_id" %in% colnames(snv_data))){
+      for(i in seq_len(nrow(snv_data))){
+        snv_data$mutation_id[i] <- paste0(snv_data$seqnames[i], "_", snv_data$start[i], "_", snv_data$ref[i], "_", snv_data$alt[i])
+      }
+    }
+    snv_data <- as.data.frame(cbind(select(snv_data, gene, mutation_id, ref, alt), select(snv_data, -c(gene, mutation_id, ref, alt, seqnames, sampleNames, width, strand))))
+  }
 
-  colnames(probe_data) <- tolower(colnames(probe_data))
-  colnames(gene_data) <- tolower(colnames(gene_data))
-  colnames(segment_data) <- tolower(colnames(segment_data))
-  colnames(snv_data) <- tolower(colnames(snv_data))
-  colnames(meta_data) <- tolower(colnames(meta_data))
+  for(df in list(probe_data, gene_data, segment_data, snv_data, meta_data)){
+    colnames(df) <- tolower(colnames(df))
+  }
 
   chromosomes <- c(paste0("chr", "1":"22"), "chrX", "chrY")
-  if(nrow(gene_data) > 0){
+  if (nrow(gene_data) > 0) {
     genes <- c("", sort(unique(gene_data$gene)))
-  } else if(nrow(probe_data) > 0){
+  } else if (nrow(probe_data) > 0) {
     genes <- c("", sort(unique(probe_data$gene)))
   } else{
     genes <- c("No gene information")
@@ -106,8 +127,10 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                             h3(sample_name),
                             tableOutput("meta"),
                             br(),
-                            plotlyOutput("chr_plot", width = "100%"),
+                            conditionalPanel(condition = "input.chr == 'all'",
+                                             column(12, plotlyOutput("all_plot", width = "100%", height = "1200px"))),
                             conditionalPanel("input.chr != 'all'",
+                                             column(12, plotlyOutput("chr_plot")),
                                              column(10, offset = 1,
                                                     h4(textOutput("gene_text")), br(),
                                                     DTOutput("mutations"), br(),
@@ -157,6 +180,12 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       gene_data$copies <- ifelse(gene_data$cn == 1, " copy", " copies")
       if("loh" %in% colnames(gene_data)){
         gene_data$loh <- ifelse(is.na(gene_data$loh), FALSE, gene_data$loh)
+      }
+    }
+
+    if(nrow(segment_data) > 0){
+      if("loh" %in% colnames(segment_data)){
+        segment_data$loh <- ifelse(is.na(segment_data$loh), FALSE, segment_data$loh)
       }
     }
 
@@ -230,7 +259,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       }
     } else segment_data_sig <- data.frame()
 
-    for(i in c(1:length(chromosomes))){
+    for(i in seq_len(length(chromosomes))){
 
       if(nrow(gene_data) > 0){
         # use gene data
@@ -304,13 +333,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                      y = log((ploidy-0.5)/2, 2), yend = log((ploidy-0.5)/2, 2), line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
         add_segments(x = 0, xend = xmax,
                      y = log((ploidy+0.5)/2, 2), yend = log((ploidy+0.5)/2, 2), line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
-        layout(yaxis=list(title = "log(2) copy number ratio",
+        layout(autosize = TRUE,yaxis=list(title = "log(2) copy number ratio",
                           titlefont = list(size = 8),
                           range = c(-3.5, 6)),
                xaxis= list(range = c(0,xmax)))
 
       if(nrow(get(paste0(chromosomes[i], "_seg")))>0){
-        for(j in 1:nrow(get(paste0(chromosomes[i], "_seg")))){
+        for(j in seq_len(nrow(get(paste0(chromosomes[i], "_seg"))))){
           plot <- plot %>% add_segments(x = get(paste0(chromosomes[i], "_seg"))$start[j],
                                         xend = get(paste0(chromosomes[i], "_seg"))$end[j],
                                         y = get(paste0(chromosomes[i], "_seg"))$log2[j],
@@ -350,10 +379,11 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                                 chr16_subplot, chr17_subplot, chr18_subplot,
                                 chr19_subplot, chr20_subplot, chr21_subplot,
                                 chr22_subplot, chrX_subplot, chrY_subplot,
-                                nrows=9, shareY = TRUE, shareX = TRUE) %>%
-      layout(autosize = FALSE, height = 1200)
+                                nrows=8, shareY = TRUE, shareX = TRUE, which_layout = 1)
 
     plot_todisplay <- reactive({ get(paste0(input$chr, "_plot")) })
+
+    output$all_plot <- renderPlotly(all_plot)
 
     output$chr_plot <- renderPlotly(plot_todisplay())
 
@@ -424,7 +454,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         add_segments(x = min(probe_data_select()$start), xend = max(probe_data_select()$end), y = 0.32, yend = 0.32, line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
         layout(
           title = probe_plot_title(),
-          xaxis = list(tickfont = list(size = 6), range = min(probe_data_select()$s), max(probe_data_select()$e)),
+          xaxis = list(tickfont = list(size = 6), range = min(probe_data_select()$start), max(probe_data_select()$end)),
           yaxis=list(tickfont = list(size = 6), title = "log(2) copy number ratio",
                      titlefont = list(size = 8),
                      range = c(min(min(probe_data_select()$log2)-1,0), max(max(probe_data_select()$log2)+1),0)),
@@ -470,7 +500,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                              escape = FALSE,
                              rownames = FALSE,
                              options = list(dom = 't', columnDefs = list(list(className = 'dt-center')))) %>%
-                 DT::formatStyle(c(1:dim(gene_snvs())[2]), border = '1px solid #ddd'))
+                 DT::formatStyle(seq_len(dim(gene_snvs())[2]), border = '1px solid #ddd'))
       } else return(data.frame())
     })
 
@@ -481,27 +511,12 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     })
 
     # TCGA data tab
-    if(exists("cbio")){
-      cbio_studyId <- reactive({cbio_studies$studyId[cbio_studies$Cancer == input$cancer]})
-      cbio_table <- reactive({
-        cBioPortalData::getDataByGenePanel(api = cbio,
-                                           studyId = cbio_studyId(),
-                                           genePanelId = "IMPACT468",
-                                           molecularProfileId = paste0(cbio_studyId(), "_gistic"),
-                                           sampleListId = paste0(cbio_studyId(), "_cna"))
-      })
-      cbio_dat <- reactive({ data.frame(cbio_table()[[1]], stringsAsFactors = FALSE) })
-      output$cbioOutput <- DT::renderDT({
-        req(nchar(input$cancer)>0)
-        DT::datatable(cbio_dat() %>% dplyr::group_by(hugoGeneSymbol) %>%
-                        dplyr::summarise(Gain = sum(value ==1)/n(),
-                                         Amplification = sum(value == 2)/n(),
-                                         ShallowDeletion = sum(value == -1)/n(),
-                                         DeepDeletion = sum(value == -2)/n()),
-                      rownames = FALSE) %>%
-          DT::formatPercentage(c("Gain", "Amplification", "ShallowDeletion", "DeepDeletion"), 2)
-      })
-    }
+    output$cbioOutput <- DT::renderDataTable({
+      datatable(filter(all_tcga2018_data, study_name == input$cancer) %>%
+                  select(hugoGeneSymbol, Gain, Amplification, ShallowDeletion, DeepDeletion),
+                rownames = FALSE) %>%
+        formatPercentage(c("Gain", "Amplification", "ShallowDeletion", "DeepDeletion"), 2)
+    })
 
     # karyotype diagram
     if(nrow(segment_data)>0){

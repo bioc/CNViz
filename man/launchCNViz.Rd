@@ -16,13 +16,13 @@ launchCNViz(
 \arguments{
 \item{sample_name}{A string with the ID/name of your sample.}
 
-\item{probe_data}{A dataframe containing probe-level data. Column names must include chr, gene, start, end, log2. Optional column: weight. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.}
+\item{probe_data}{A dataframe or GRanges object containing probe-level data. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional column/metadata: weight, where weight is numeric.}
 
-\item{gene_data}{A dataframe containing gene-level data - one row per gene. Column names must include chr, gene, start, end, log2. Optional columns: weight, loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.}
+\item{gene_data}{A dataframe or GRanges object containing gene-level data - one row per gene. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional columns/metadata: weight, loh; where weight is numeric and loh values are TRUE or FALSE.}
 
-\item{segment_data}{A dataframe containing segment-level data. Column names must include chr, start, end, log2. Optional column: loh; where loh values are TRUE or FALSE. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric.}
+\item{segment_data}{A dataframe or GRanges object containing segment-level data. If a dataframe, column names must include chr, start, end, log2. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional column/metadata: loh; where loh values are TRUE or FALSE.}
 
-\item{snv_data}{A dataframe containg SNVs and columns of your choosing. The only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. Additional columns might include depth, allelic_fraction.}
+\item{snv_data}{A dataframe or VRanges object containg SNVs and columns of your choosing. If a dataframe, the only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. If a VRanges object, make sure gene is one of the metadata columns, so it can be tied to the gene or probe data; a mutation_id column can also be included, otherwise it will be constructed. Additional columns might include depth, allelic_fraction.}
 
 \item{meta_data}{A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.}
 }
@@ -34,6 +34,7 @@ CNViz launches a shiny application to visualize your sample's copy number data.
 At least one of probe_data, gene_data, or segment_data must be supplied;
 sample_name, snv_data and meta_data are all optional. The more inputs supplied,
 the more informative the application will be. See the CNViz vignette for more information.
+Use the hg38 reference genome. CNViz only displays a single sample's data.
 }
 \examples{
 probes <- data.frame(chr = c("chr1", "chr1", "chr4", "chr4", "chrX"),
@@ -48,7 +49,9 @@ end = c(122026459, 246947668,  49712061, 188110779,  37098762),
 log2 = c(1, 1, 1, 1, 0.5849625), loh = c(FALSE, FALSE, FALSE, TRUE, TRUE))
 meta <- data.frame(purity = c(.5),
 ploidy = c(2), sex = c("Female"))
-# launchCNViz(sample_name = "sample123", probe_data = probes,
-# segment_data = segments, meta_data = meta)
+\donttest{
+launchCNViz(sample_name = "sample123", probe_data = probes,
+segment_data = segments, meta_data = meta)
+}
 
 }
