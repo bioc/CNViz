@@ -156,9 +156,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                         div(style="display: inline-block;", a("cBioPortal website,", target ="_blank", href = "https://www.cbioportal.org/")),
                         div(style="display: inline-block;", a("cBioPortal FAQ,", target ="_blank", href = "https://docs.cbioportal.org/1.-general/faq")),
                         div(style="display: inline-block;", a("cBioPortalData R Package,", target ="_blank", href = "https://bioconductor.org/packages/release/bioc/html/cBioPortalData.html")),
-                        div(style="display: inline-block;", a("GISTIC paper", target ="_blank", href = "https://pubmed.ncbi.nlm.nih.gov/18077431/")),
-                        br(), br(), br(), br(), br(), br(), br(),
-                        p(em("Code available at GitHub.com/rebeccagreenblatt/CNViz.")))
+                        div(style="display: inline-block;", a("GISTIC paper", target ="_blank", href = "https://pubmed.ncbi.nlm.nih.gov/18077431/")))
     )
   ),
   server <- function(input, output, session) {
