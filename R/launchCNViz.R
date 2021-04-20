@@ -23,12 +23,11 @@
 #' @importFrom plotly plot_ly add_segments add_trace layout renderPlotly plotlyOutput event_data subplot
 #' @importFrom karyoploteR plotKaryotype
 #' @importFrom CopyNumberPlots plotCopyNumberCalls
-#' @importFrom GenomicRanges makeGRangesFromDataFrame
+#' @importFrom GenomicRanges makeGRangesFromDataFrame seqnames width strand
 #' @importFrom magrittr %>%
 #' @importFrom DT DTOutput renderDT formatPercentage datatable formatStyle
 #' @importFrom scales rescale
 #' @importFrom graphics legend
-#' @importFrom GenomicRanges seqnames width strand
 #'
 #' @examples
 #' probes <- data.frame(chr = c("chr1", "chr1", "chr4", "chr4", "chrX"),
@@ -295,7 +294,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
         assign(chromosomes[i], data.frame())
       }
 
-      marker_colors <- ifelse(between(get(chromosomes[i])$log2, 0.32, 0.41), white, blue) # make blue if < 1.5 or > 2.5
+      marker_colors <- ifelse(between(get(chromosomes[i])$log2, -0.41, 0.32), white, blue) # make blue if < 1.5 or > 2.5
       marker_colors <- ifelse(get(chromosomes[i])$loh == TRUE, black, marker_colors)
       marker_colors <- ifelse(get(chromosomes[i])$mutation_present == TRUE, pink, marker_colors)
       outline_colors <- ifelse(marker_colors == white, green, marker_colors)
