@@ -62,14 +62,14 @@ head(segment_data)
 ```
 
 ### `snv_data`
-Each row will correspond to a singlue nucleotide variant (SNV). The gene, and mutation_id (in any format) must be included. Other columns like depth and starting location (start) are optional. If start is included, this will enable CNViz to plot the location of the mutation on the probe plot. 
+Each row will correspond to a singlue nucleotide variant (SNV). The gene, and mutation_id (in any format) must be included. Other columns like depth and starting location (start) are optional. If start is included, this will enable CNViz to plot the location of the mutation on the probe plot. This table can include short insertions and deletions as long as they are formatted in the same manner - in this case, you may want to include a ref and alt column. 
 ```{r}
 data(snv_data)
 head(snv_data)
 ```
 
 ## Output
-```{r}
+```{r, eval = FALSE}
 launchCNViz(sample_name = "sample123", meta_data = meta_data, probe_data = probe_data, gene_data = gene_data, segment_data = segment_data, snv_data = snv_data)
 ```
 This will launch a Shiny application. See https://rebeccagreenblatt.shinyapps.io/cnviz_example for a live example using simulated data. 
