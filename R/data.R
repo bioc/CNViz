@@ -85,10 +85,10 @@
 #' @source Center for Personalized Diagnositics at the University of Pennsylvania
 "segment_data"
 
-#' @title Single Nucleotide Variant (SNV) data for vignette example
+#' @title Variant data for vignette example
 #' @docType data
-#' @usage data(snv_data)
-#' @description A dataset containing simulated SNV data as sample input for launchCNViz
+#' @usage data(variant_data)
+#' @description A dataset containing simulated SNV and indel data as sample input for launchCNViz
 #' @format A dataframe with 119 rows and 4 variables
 #' \describe{
 #'     \item{gene}{gene name}
@@ -97,7 +97,7 @@
 #'     \item{start}{starting location}
 #'     }
 #' @source Center for Personalized Diagnositics at the University of Pennsylvania
-"snv_data"
+"variant_data"
 
 #' @title Metadata for vignette example
 #' @docType data

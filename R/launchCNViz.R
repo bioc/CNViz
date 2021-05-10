@@ -2,15 +2,15 @@
 #'
 #' CNViz launches a shiny application to visualize your sample's copy number data.
 #' At least one of probe_data, gene_data, or segment_data must be supplied;
-#' sample_name, snv_data and meta_data are all optional. The more inputs supplied,
+#' sample_name, variant_data and meta_data are all optional. The more inputs supplied,
 #' the more informative the application will be. See the CNViz vignette for more information.
 #' Use the hg38 reference genome. CNViz only displays a single sample's data.
 #'
 #' @param sample_name A string with the ID/name of your sample.
-#' @param probe_data A dataframe or GRanges object containing probe-level data. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional column/metadata: weight, where weight is numeric.
-#' @param gene_data A dataframe or GRanges object containing gene-level data - one row per gene. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional columns/metadata: weight, loh; where weight is numeric and loh values are TRUE or FALSE.
+#' @param probe_data A dataframe or GRanges object containing probe-level data. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, gene and log2 are metadata columns. Optional column/metadata: weight, where weight is numeric.
+#' @param gene_data A dataframe or GRanges object containing gene-level data - one row per gene. If a dataframe, column names must include chr, gene, start, end, log2. chr/seqnames column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, gene and log2 are metadata columns. Optional columns/metadata: weight, loh; where weight is numeric and loh values are TRUE or FALSE.
 #' @param segment_data A dataframe or GRanges object containing segment-level data. If a dataframe, column names must include chr, start, end, log2. chr column should be formatted as 'chr1' through 'chrX', 'chrY'. start, end and log2 should be numeric. If a GRanges object, log2 is a metadata column. Optional column/metadata: loh; where loh values are TRUE or FALSE.
-#' @param snv_data A dataframe or VRanges object containg SNVs and columns of your choosing. If a dataframe, the only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. If a VRanges object, make sure gene is one of the metadata columns, so it can be tied to the gene or probe data; a mutation_id column can also be included, otherwise it will be constructed. Additional columns might include depth, allelic_fraction, ref, alt. Small insertions and deletions can be included as long as they are formatted in the same manner.
+#' @param variant_data A dataframe or VRanges object containg SNVs and short indels and columns of your choosing. If a dataframe, the only required columns are gene and mutation_id. Optional column: start; where start indicates the starting position of the mutation. If a VRanges object, make sure gene is one of the metadata columns, so it can be tied to the gene or probe data; a mutation_id column can also be included, otherwise it will be constructed. Additional columns might include depth, allelic_fraction, ref, alt.
 #' @param meta_data A dataframe containing your sample's metadata - columns of your choosing. Optional column: ploidy; ploidy will be rounded to the nearest whole number. Additional columns might include purity. This dataframe should only have one row.
 #'
 #' @return a Shiny application
@@ -50,7 +50,7 @@
 #' @export launchCNViz
 #'
 
-launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_data = data.frame(), segment_data = data.frame(), snv_data = data.frame(), meta_data = data.frame()) {
+launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_data = data.frame(), segment_data = data.frame(), variant_data = data.frame(), meta_data = data.frame()) {
 
   if(is(probe_data, "GRanges")){
     probe_data <- as.data.frame(probe_data)
@@ -64,17 +64,17 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     segment_data <- as.data.frame(segment_data)
     segment_data$chr <- segment_data$seqnames
   }
-  if(is(snv_data, "VRanges")){
-    snv_data <- as.data.frame(snv_data)
-    if(!("mutation_id" %in% colnames(snv_data))){
-      for(i in seq_len(nrow(snv_data))){
-        snv_data$mutation_id[i] <- paste0(snv_data$seqnames[i], "_", snv_data$start[i], "_", snv_data$ref[i], "_", snv_data$alt[i])
+  if(is(variant_data, "VRanges")){
+    variant_data <- as.data.frame(variant_data)
+    if(!("mutation_id" %in% colnames(variant_data))){
+      for(i in seq_len(nrow(variant_data))){
+        variant_data$mutation_id[i] <- paste0(variant_data$seqnames[i], "_", variant_data$start[i], "_", variant_data$ref[i], "_", variant_data$alt[i])
       }
     }
-    snv_data <- as.data.frame(cbind(select(snv_data, gene, mutation_id, ref, alt), select(snv_data, -c(gene, mutation_id, ref, alt, seqnames, sampleNames, width, strand))))
+    variant_data <- as.data.frame(cbind(select(variant_data, gene, mutation_id, ref, alt), select(variant_data, -c(gene, mutation_id, ref, alt, seqnames, sampleNames, width, strand))))
   }
 
-  for(df in list(probe_data, gene_data, segment_data, snv_data, meta_data)){
+  for(df in list(probe_data, gene_data, segment_data, variant_data, meta_data)){
     colnames(df) <- tolower(colnames(df))
   }
 
@@ -106,13 +106,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                             if(nrow(gene_data) > 0 | nrow(probe_data) > 0){
                               img(src="https://cnviz.s3.amazonaws.com/markers.png", width = "100%")
                             },
-                            if(nrow(snv_data) > 0 & (nrow(gene_data) + nrow(probe_data) > 0)){
+                            if(nrow(variant_data) > 0 & (nrow(gene_data) + nrow(probe_data) > 0)){
                               img(src="https://cnviz.s3.amazonaws.com/mutation.png", width = "100%")
                             },
                             if("loh" %in% colnames(gene_data)){
                               img(src="https://cnviz.s3.amazonaws.com/marker_loh.png", width = "100%")
                             },
-                            if("loh" %in% colnames(gene_data) & nrow(snv_data) > 0){
+                            if("loh" %in% colnames(gene_data) & nrow(variant_data) > 0){
                               img(src="https://cnviz.s3.amazonaws.com/mutation_loh.png", width = "100%")
                             },
                             if(nrow(segment_data) > 0){
@@ -145,7 +145,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                tabPanel(icon("info-circle", class = NULL, lib = "font-awesome"),
                         fluid=TRUE,
                         h5("Patient Data"),
-                        p("The visualization displayed is a representation of your input data. No additional inference has been done. Ploidy, if included, and copy numbers are rounded to the nearest whole number. Only one of probe, gene or segment data is required to launch the application. LOH and SNV data are optional. Please note, probe and gene data may not align with one another if the method used to generate your gene data was adjusted for sample purity and/or tumor ploidy."),
+                        p("The visualization displayed is a representation of your input data. No additional inference has been done. Ploidy, if included, and copy numbers are rounded to the nearest whole number. Only one of probe, gene or segment data is required to launch the application. LOH and variant (SNVs, short indels) data are optional. Please note, probe and gene data may not align with one another if the method used to generate your gene data was adjusted for sample purity and/or tumor ploidy."),
                         h5("TCGA Pan-Cancer Atlas Data"),
                         p("TCGA Pan-Cancer Atlas Data was obtained from cBioPortal's R package cBioPortalData. This same information can be found on cBioPortal's website. Similar information from many additional studies can also be found on their website. The copy number data displayed was generated by the GISTIC algorithm."),
                         p(" - Deep Deletion indicates a deep loss, possibly a homozygous deletion"),
@@ -246,13 +246,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       gene_data <- gene_data %>% dplyr::mutate(weight = total_weight)
     }
 
-    # highlight segments that are outside of tumor ploidy; if none supplied, use ploidy of 2
+    # highlight segments that are outside of tumor ploidy; if none supplied, use ploidy of 2. Highlight any sex chromosome segments.
     ploidy <- ifelse(is.null(meta_data$ploidy), 2, meta_data$ploidy)
     if(nrow(segment_data) > 0){
       if("loh" %in% colnames(segment_data)){
-        segment_data_sig <- dplyr::filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2) | loh == TRUE)
+        segment_data_sig <- dplyr::filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2) | loh == TRUE | chr %in% c("chrX", "chrY"))
       } else {
-        segment_data_sig <- dplyr::filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2))
+        segment_data_sig <- dplyr::filter(segment_data, log2 < log((ploidy-0.5)/2,2) | log2 > log((ploidy+0.5)/2,2) | chr %in% c("chrX", "chrY"))
       }
     } else segment_data_sig <- data.frame()
 
@@ -267,8 +267,8 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
           gene_data$total_weight <- rep(10, nrow(gene_data))
         }
         chr <- dplyr::filter(gene_data, chr == chromosomes[i])
-        if(nrow(snv_data)>0){
-          chr <- chr %>% left_join(snv_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
+        if(nrow(variant_data)>0){
+          chr <- chr %>% left_join(variant_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
           chr$mutation_present <- ifelse(is.na(chr$mutation_present), FALSE, TRUE)
         } else chr$mutation_present <- rep(FALSE, nrow(chr))
         if(!("loh" %in% colnames(gene_data))){
@@ -282,8 +282,8 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
           probe_sizeref = 0.4
         } else{ probe_sizeref = 0.7 }
         chr <- dplyr::filter(probe_by_gene, chr == chromosomes[i])
-        if(nrow(snv_data)>0){
-          chr <- chr %>% left_join(snv_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
+        if(nrow(variant_data)>0){
+          chr <- chr %>% left_join(variant_data %>% dplyr::group_by(gene) %>% dplyr::summarise(mutation_present = TRUE), by = "gene")
           chr$mutation_present <- ifelse(is.na(chr$mutation_present), FALSE, TRUE)
         } else chr$mutation_present <- rep(FALSE, nrow(chr))
         chr$loh <- rep(FALSE, nrow(chr))
@@ -303,7 +303,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       if(nrow(segment_data)>0 & "loh" %in% colnames(segment_data)){
         segment_data_sig$seg_color <- ifelse(segment_data_sig$loh == TRUE, black, orange)
       } else if(nrow(segment_data) > 0) {
-        segment_data_sig$seg_color <- orange #error (have to add an else if)
+        segment_data_sig$seg_color <- orange
       }
 
       if(nrow(segment_data_sig) > 0){
@@ -405,9 +405,9 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
       } else data.frame()
     })
 
-    snv_data_select <- eventReactive(input$gene,{
-      if(nrow(snv_data)>0 & "start" %in% colnames(snv_data)){
-        dplyr::filter(snv_data, gene == input$gene)
+    variant_data_select <- eventReactive(input$gene,{
+      if(nrow(variant_data)>0 & "start" %in% colnames(variant_data)){
+        dplyr::filter(variant_data, gene == input$gene)
       } else data.frame()
     })
 
@@ -438,13 +438,13 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                     sizemode = "area",
                     sizeref = ifelse(exists("probe_sizeref"), probe_sizeref, 1)),
                   showlegend = FALSE) %>%
-        add_trace(x = as.numeric(snv_data_select()$start),
-                  y = rep(0, nrow(snv_data_select())),
+        add_trace(x = as.numeric(variant_data_select()$start),
+                  y = rep(0, nrow(variant_data_select())),
                   marker=list(
                     symbol = 'x',
                     size = 10,
                     color = 'black'),
-                  text = snv_data_select()$mutation_id,
+                  text = variant_data_select()$mutation_id,
                   hoverinfo = 'text',
                   showlegend = FALSE) %>%
         add_segments(x = min(probe_data_select()$start), xend = max(probe_data_select()$end), y = -0.41, yend = -0.41, line = list(color = "gray", width = 1, dash = "dot"), showlegend = FALSE) %>%
@@ -459,8 +459,8 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     })
 
     gene_snvs <- eventReactive(input$gene,{
-      if(nrow(snv_data) > 0){
-        return(dplyr::filter(snv_data, gene == input$gene))
+      if(nrow(variant_data) > 0){
+        return(dplyr::filter(variant_data, gene == input$gene))
       } else return(data.frame())
     })
 
