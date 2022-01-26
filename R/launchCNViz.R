@@ -41,7 +41,7 @@
 #' end = c(122026459, 246947668,  49712061, 188110779,  37098762),
 #' log2 = c(1, 1, 1, 1, 0.5849625), loh = c(FALSE, FALSE, FALSE, TRUE, TRUE))
 #' meta <- data.frame(purity = c(.5),
-#' ploidy = c(2), sex = c("Female"))
+#' ploidy = c(2, sex = c("Female"))
 #' \donttest{
 #' launchCNViz(sample_name = "sample123", probe_data = probes,
 #' segment_data = segments, meta_data = meta)
@@ -79,6 +79,7 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
   }
 
   chromosomes <- c(paste0("chr", "1":"22"), "chrX", "chrY")
+
   if (nrow(gene_data) > 0) {
     genes <- c("", sort(unique(gene_data$gene)))
   } else if (nrow(probe_data) > 0) {
@@ -92,7 +93,9 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                tabPanel("Patient Data", fluid=TRUE,
                         sidebarLayout(
                           sidebarPanel(
-                            width = 3,
+                            width = 2,
+                            actionButton("home", icon("home")),
+                            br(), br(),
                             selectInput(inputId = "chr",
                                         label = "chromosome",
                                         choices = c("all", chromosomes),
@@ -123,11 +126,12 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
                             }
                           ),
                           mainPanel(
+                            width = 10,
                             h3(sample_name),
                             tableOutput("meta"),
                             br(),
                             conditionalPanel(condition = "input.chr == 'all'",
-                                             column(12, plotlyOutput("all_plot", width = "100%", height = "1200px"))),
+                                             column(12, plotlyOutput("all_plot", width = "100%", height = "1600px"))),
                             conditionalPanel("input.chr != 'all'",
                                              column(12, plotlyOutput("chr_plot")),
                                              column(10, offset = 1,
@@ -397,6 +401,10 @@ launchCNViz <- function(sample_name = "sample", probe_data = data.frame(), gene_
     observeEvent(input$chr, {
       updateSelectizeInput(session, "gene", selected =
                              ifelse(by_gene[by_gene$gene == input$gene,"chr"][1] == input$chr, input$gene, ""))
+    })
+
+    observeEvent(input$home, {
+      updateSelectizeInput(session, "chr", selected = "all")
     })
 
     probe_data_select <- eventReactive(input$gene,{
